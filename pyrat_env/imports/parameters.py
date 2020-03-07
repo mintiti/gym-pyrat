@@ -17,7 +17,6 @@
 
 import argparse
 import sys
-import random
 
 # Parse arguments
 parser = argparse.ArgumentParser()

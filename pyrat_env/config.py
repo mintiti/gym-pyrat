@@ -1,5 +1,3 @@
-
-
 cfg = {
-    "resolution" : (1920,1080)
+    "resolution": (1920, 1080)
 }

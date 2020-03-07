@@ -1,5 +1,3 @@
-import random
-
 TEAM_NAME = "Dummy"
 def preprocessing(mazeMap, mazeWidth, mazeHeight, playerLocation, opponentLocation, piecesOfCheese, timeAllowed):
     return

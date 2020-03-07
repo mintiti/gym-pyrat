@@ -8,13 +8,16 @@ from ..config import cfg
 from pickle import load, dump
 from ..imports.maze import *
 from ..imports.display import *
+from ..imports.parameters import *
+
 # CONSTANTS
-DECISON_FROM_ACTION_DICT = {
+DECISION_FROM_ACTION_DICT = {
     0: 'L',
     1: 'U',
     2: "R",
     3: 'D'
 }
+
 
 class PyratEnv(gym.Env):
     # TODO : add mud
@@ -22,7 +25,7 @@ class PyratEnv(gym.Env):
     # TODO : recode the maze matrix to be 4 matrices indicating whether you can go up, down, to the right and to the left respectively
     """
     Description:
-        2 agents compete in a maze for rewards roanomly dispersed in the maze. The goal is to collect the most.
+        2 agents compete in a maze for rewards randomly dispersed in the maze. The goal is to collect the most.
     Observation:
         Type: Dict({
         'Maze' :
@@ -122,40 +125,36 @@ class PyratEnv(gym.Env):
                                           ])
 
         # Define the observation space
-        product = self.width * self.height
         self.observation_space = spaces.Dict({
             'Maze_up': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'Maze_down': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'Maze_right': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'Maze_left': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'pieces_of_cheese': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'turn': spaces.Discrete(self.max_turns),
-            'player_scores': spaces.Tuple([spaces.Box(low=0, high=self.nb_pieces_of_cheese, shape=(1,)),
-                                           spaces.Box(low=0, high=self.nb_pieces_of_cheese, shape=(1,))]),
             'player1_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
             'player2_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
 
         })
 
-        #Follow the play :
+        # Follow the play :
         self.player1_last_move = None
         self.player2_last_move = None
-        self.bg= None
+        self.bg = None
 
     @classmethod
-    def fromPickle(cls, p = "./maze_files/maze.p"):
+    def fromPickle(cls, p="./maze_files/maze.p"):
         """
         Lets you load a given maze from a previously pickled object
         Sample can be found under ./maze_files/maze.p
         :param p: the path to the maze
         :return: the object instance
         """
-        return load(open(p,'rb'))
+        return load(open(p, 'rb'))
 
     def step(self, action):
         self.turn += 1
         # Perform both player's actions on the maze variables
-        decision1, decision2 = DECISON_FROM_ACTION_DICT[action[0]], DECISON_FROM_ACTION_DICT[action[1]]
+        decision1, decision2 = DECISION_FROM_ACTION_DICT[action[0]], DECISION_FROM_ACTION_DICT[action[1]]
         self.player1_last_move = decision1
         self.player2_last_move = decision2
         self._move((decision1, decision2))
@@ -197,7 +196,6 @@ class PyratEnv(gym.Env):
         self._cheese_matrix_from_list()
         self._maze_matrix_from_dict()
 
-
     # TODO : Rendering : maybe switch it to something better than pygame
     # TODO : Sound
     def render(self, mode='human'):
@@ -208,19 +206,24 @@ class PyratEnv(gym.Env):
             if self.bg is None:
                 pygame.init()
                 screen = pygame.display.set_mode(cfg['resolution'])
-                self.bg = build_background(screen, self.maze, tiles, image_background, image_tile, image_wall, image_corner,
-                                  image_mud,
-                                  offset_x, offset_y, self.width, self.height, window_width, window_height,
-                                  image_portrait_rat,
-                                  image_portrait_python, scale, True, True)
+                self.bg = build_background(screen, self.maze, tiles, image_background, image_tile, image_wall,
+                                           image_corner,
+                                           image_mud,
+                                           offset_x, offset_y, self.width, self.height, window_width, window_height,
+                                           image_portrait_rat,
+                                           image_portrait_python, scale, True, True)
             screen = pygame.display.get_surface()
             screen.blit(self.bg, (0, 0))
-            draw_pieces_of_cheese(self.pieces_of_cheese, image_cheese, offset_x, offset_y, scale, self.width, self.height, screen,
+            draw_pieces_of_cheese(self.pieces_of_cheese, image_cheese, offset_x, offset_y, scale, self.width,
+                                  self.height, screen,
                                   window_height)
-            draw_players(self.player1_location, self.player2_location, image_rat, image_python, offset_x, offset_y, scale, self.width,
+            draw_players(self.player1_location, self.player2_location, image_rat, image_python, offset_x, offset_y,
+                         scale, self.width,
                          self.height, screen, window_height)
-            draw_scores("Rat", self.player1_score, image_portrait_rat, "Python", self.player2_score, image_portrait_python, window_width,
-                        window_height, screen, True, True, self.player1_last_move, self.player1_misses, self.player2_last_move, self.player2_misses, 0,
+            draw_scores("Rat", self.player1_score, image_portrait_rat, "Python", self.player2_score,
+                        image_portrait_python, window_width,
+                        window_height, screen, True, True, self.player1_last_move, self.player1_misses,
+                        self.player2_last_move, self.player2_misses, 0,
                         0)
             pygame.display.update()
             pygame.event.get()
@@ -230,7 +233,7 @@ class PyratEnv(gym.Env):
 
     # Utils methods
 
-    def save_pickle(self, path = "./maze_files/maze_save.p"):
+    def save_pickle(self, path="./maze_files/maze_save.p"):
         """
         pickles the maze to the given path
         :param path: the path to save to
@@ -240,15 +243,17 @@ class PyratEnv(gym.Env):
 
     def _observation(self):
         return dict({
-            'Maze': self.maze_matrix,
+            'Maze_up': self.maze_matrix_U,
+            'Maze_right': self.maze_matrix_R,
+            'Maze_left': self.maze_matrix_L_,
+            'Maze_down': self.maze_matrix_D,
             'pieces_of_cheese': self.cheese_matrix,
-            'turn': self.turn,
-            'player_scores': [self.player1_score, self.player2_score],
             'player1_location': self.player1_location,
             'player2_location': self.player2_location,
         })
 
     def matrix_index_to_pos(self, index):
+        # noinspection PyRedundantParentheses
         return (index % self.width, index // self.width)
 
     def pos_to_matrix_index(self, pos):
@@ -262,7 +267,7 @@ class PyratEnv(gym.Env):
         maze_dict = self.maze
         for position in maze_dict:
             for destination in maze_dict[position]:
-                direction = self._calculate_direction(position,destination)
+                direction = self._calculate_direction(position, destination)
                 if direction == 'U':
                     self.maze_matrix_U[position[0], position[1]] = 1
                 elif direction == 'D':
@@ -278,7 +283,7 @@ class PyratEnv(gym.Env):
 
     def _calculate_reward(self):
         """
-        Returns the reward for the current turn and removes the potential cheeses taht have been eaten
+        Returns the reward for the current turn and removes the potential cheeses that have been eaten
         reward is 1 if the player 1 eats a piece of cheese and player 2 doesnt, -1 if player 2 does and player 1 doesnt and 0 in all other cases
         :return: reward
         """
@@ -311,63 +316,19 @@ class PyratEnv(gym.Env):
             self.player2_moves, self.player1_misses, self.player2_misses)
 
     def _check_done(self):
+        # noinspection PyRedundantParentheses,PyRedundantParentheses
         return (self.turn >= self.max_turns) or (self.player1_score > (self.nb_pieces_of_cheese) / 2) or (
                 self.player2_score > (self.nb_pieces_of_cheese) / 2)
 
-    def _calculate_direction(self,source,destination):
+    def _calculate_direction(self, source, destination):
         direction = None
         delta = (destination[0] - source[0], destination[1] - source[1])
-        if delta == (0,1):
+        if delta == (0, 1):
             direction = 'U'
-        elif delta == (0,-1):
+        elif delta == (0, -1):
             direction = 'D'
-        elif delta == (1,0):
+        elif delta == (1, 0):
             direction = 'R'
-        elif delta == (-1,0):
+        elif delta == (-1, 0):
             direction = 'L'
         return direction
-
-if __name__ == '__main__':
-    maze = PyratEnv()
-    import pygame
-    path = '/maze.p'
-    maze.save_pickle(path)
-    maze2 = PyratEnv.fromPickle(path)
-    print(maze.maze)
-    print(maze.cheese_matrix)
-    print(maze2.maze)
-    print(maze2.cheese_matrix)
-    print(f'position du joueur 1 : {maze.player1_location}\nposition du jooueur 2 : {maze.player2_location}')
-    maze.render()
-
-    # print(maze.cheese_matrix)
-    # while True :
-    #     print(maze.step((random.randint(0,3), random.randint(0,3))))
-    #     print(f'position du joueur 1 : {maze.player1_location}\nposition du jooueur 2 : {maze.player2_location}')
-    #     maze.render()
-    #print("display is ", pygame.display.get_init())
-    # pygame.init()
-    #
-     #   time.sleep(0.03)
-    # screen = pygame.display.set_mode((1920, 1080))
-    #
-    # window_width, window_height = 1920, 1080
-    # scale, offset_x, offset_y, image_background, image_cheese, image_corner, image_moving_python, image_moving_rat, image_python, image_rat, image_wall, image_mud, image_portrait_python, image_portrait_rat, tiles, image_tile = init_coords_and_images(
-    #     maze.width, maze.height, True, True, window_width, window_height)
-    #
-    # bg = build_background(screen, maze.maze, tiles, image_background, image_tile, image_wall, image_corner, image_mud,
-    #                       offset_x, offset_y, maze.width, maze.height, window_width, window_height, image_portrait_rat,
-    #                       image_portrait_python, scale, True, True)
-    # screen.blit(bg, (0,0))
-    # print('test', screen == pygame.display.get_surface())
-    # running = True
-    # while running:
-    #     draw_pieces_of_cheese(maze.pieces_of_cheese, image_cheese, offset_x, offset_y, scale, maze.width, maze.height,
-    #                           screen,
-    #                           window_height)
-    #     pygame.display.update()
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             running = False
-
-
