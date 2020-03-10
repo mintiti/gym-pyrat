@@ -138,7 +138,7 @@ def generate_maze(width, height, target_density, connected, symmetry, mud_densit
                     if is_candidate:
                         new_possible_border.append((i,j))
                 possible_border = new_possible_border
-                if border == []:
+                if not border:
                     break
                 a,b = border[random.randrange(len(border))]
                 m = gen_mud(mud_density, mud_range)
