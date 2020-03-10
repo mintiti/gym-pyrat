@@ -1,7 +1,0 @@
-README.md
-setup.py
-gym_pyrat.egg-info/PKG-INFO
-gym_pyrat.egg-info/SOURCES.txt
-gym_pyrat.egg-info/dependency_links.txt
-gym_pyrat.egg-info/requires.txt
-gym_pyrat.egg-info/top_level.txt

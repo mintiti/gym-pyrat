@@ -4,7 +4,7 @@
 
 ### Linux ###
 *~
-
+.idea
 # temporary files which can be created if a process still has a handle open of a deleted file
 .fuse_hidden*
 
@@ -43,6 +43,7 @@
 # Gradle
 .idea/**/gradle.xml
 .idea/**/libraries
+
 
 # Gradle and Maven with auto-import
 # When using Gradle or Maven with auto-import, you should exclude module files,
