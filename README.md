@@ -17,3 +17,5 @@ You will need :
 * gym
 * numpy
 * pygame
+
+Benji
