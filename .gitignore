@@ -136,3 +136,7 @@ $RECYCLE.BIN/
 
 # End of https://www.gitignore.io/api/linux,pycharm,windows
 
+
+pyrat_env/__pycache__/
+
+*.pyc

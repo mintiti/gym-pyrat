@@ -28,31 +28,33 @@ class PyratEnv(gym.Env):
         2 agents compete in a maze for rewards randomly dispersed in the maze. The goal is to collect the most.
     Observation:
         Type: Dict({
-        'Maze' :
-            Type : Box( low = 0, high = 1, shape = (maze_width * maze_height, maze_width * maze_height), dtype = np.int8)
-                A matrix M_ij of size maze_width * maze_height
-                    where m_ij = 0 if there is a wall between bloc (i % maze_width , i // maze_width) and (j % maze_width , j // maze_width)
-                    and m_ij =1 if there is not
+            'Maze_up':
+                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
+                    A matrix [M_ij] where M_ij = 1 if you can go up from case ij
 
-        'pieces_of _cheese' :
-            Type :Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                A matrix where m_ij = 0 if there is no cheese on this bloc and 1 if there is
+            'Maze_down':
+                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
+                    A matrix [M_ij] where M_ij = 1 if you can go down from case ij
 
-        'turn' :
-            Type : Discrete(max_turns)
-                the number of turns played so far
+            'Maze_right':
+                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
+                    A matrix [M_ij] where M_ij = 1 if you can go right from case ij
 
-        'player_scores' :
-            Type : Tuple( [spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)), spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,))])
-                the score of player 1 and player 2 respectively
+            'Maze_left':
+                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
+                    A matrix [M_ij] where M_ij = 1 if you can go left from case ij
 
-        'player1_location' :
-            Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
-                The location of player 1
+            'pieces_of _cheese' :
+                Type :Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
+                    A matrix where m_ij = 0 if there is no cheese on this bloc and 1 if there is
 
-        'player2_location' :
-            Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
-                The location of player 2
+            'player1_location' :
+                Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
+                    The location of player 1
+
+            'player2_location' :
+                Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
+                    The location of player 2
         })
 
     Actions:
@@ -193,8 +195,21 @@ class PyratEnv(gym.Env):
         self.player2_last_move = None
         self.bg = None
         # Reset wrapper attributes
-        self._cheese_matrix_from_list()
+        # Create the maze matrix
+        self.maze_matrix_U = np.zeros((self.width, self.height), dtype=np.int8)
+        self.maze_matrix_D = np.zeros((self.width, self.height), dtype=np.int8)
+        self.maze_matrix_R = np.zeros((self.width, self.height), dtype=np.int8)
+        self.maze_matrix_L = np.zeros((self.width, self.height), dtype=np.int8)
         self._maze_matrix_from_dict()
+        # Create the cheese matrix
+        self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
+        self._cheese_matrix_from_list()
+
+        for start in self.maze:
+            for end in self.maze[start]:
+                self.maze[start][end] = 1
+
+        return self._observation()
 
     # TODO : Rendering : maybe switch it to something better than pygame
     # TODO : Sound
@@ -245,7 +260,7 @@ class PyratEnv(gym.Env):
         return dict({
             'Maze_up': self.maze_matrix_U,
             'Maze_right': self.maze_matrix_R,
-            'Maze_left': self.maze_matrix_L_,
+            'Maze_left': self.maze_matrix_L,
             'Maze_down': self.maze_matrix_D,
             'pieces_of_cheese': self.cheese_matrix,
             'player1_location': self.player1_location,
