@@ -17,6 +17,8 @@
 from .parameters import *
 import pygame
 import random
+import os
+dirname = os.path.dirname(__file__)
 
 
 def image_of_maze(maze, tiles, image_tile, image_wall, image_corner, image_mud, offset_x, offset_y, scale, width,
@@ -109,7 +111,7 @@ font_sizes = [50, 25, 50, 25, 50, 50, 50]
 
 def draw_text(text, font, color, max_size, index_size, x, y, screen):
     global font_sizes
-    font = pygame.font.Font("resources/fonts/" + font + ".ttf", font_sizes[index_size])
+    font = pygame.font.Font(os.path.join(dirname, '..\\resources\\fonts\\' + font + '.ttf'), font_sizes[index_size])
     label = font.render(text, 1, color)
     while label.get_rect().width > max_size:
         font_sizes[index_size] = font_sizes[index_size] - 1
@@ -160,27 +162,28 @@ def init_coords_and_images(width, height, player1_is_alive, player2_is_alive, wi
     offset_y = max(25, window_height // 2 - int(scale * height / 2))
     scale_portrait_w = int(window_width / 6)
     scale_portrait_h = int(window_width / 6)
-
-    image_background = pygame.transform.smoothscale(pygame.image.load("resources/illustrations/background.jpg"),
+    print(os.path.join(dirname, '..\\resources\\illustrations\\background.jpg'))
+    image_background = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\illustrations\\background.jpg')),
                                                     (window_width, window_height))
-    image_cheese = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/cheese.png"), (scale, scale))
-    image_corner = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/corner.png"), (scale, scale))
-    image_moving_python = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/movingPython.png"),
+
+    image_cheese = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\cheese.png')), (scale, scale))
+    image_corner = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\corner.png')), (scale, scale))
+    image_moving_python = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\movingPython.png')),
                                                        (scale, scale))
-    image_moving_rat = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/movingRat.png"),
+    image_moving_rat = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\movingRat.png')),
                                                     (scale, scale))
-    image_python = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/python.png"), (scale, scale))
-    image_rat = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/rat.png"), (scale, scale))
-    image_wall = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/wall.png"), (scale, scale))
-    image_mud = pygame.transform.smoothscale(pygame.image.load("resources/gameElements/mud.png"), (scale, scale))
-    image_portrait_python = pygame.transform.smoothscale(pygame.image.load("resources/illustrations/python_left.png"),
+    image_python = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\python.png')), (scale, scale))
+    image_rat = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\rat.png')), (scale, scale))
+    image_wall = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\wall.png')), (scale, scale))
+    image_mud = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\mud.png')), (scale, scale))
+    image_portrait_python = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\illustrations\\python_left.png')),
                                                          (scale_portrait_w, scale_portrait_h))
-    image_portrait_rat = pygame.transform.smoothscale(pygame.image.load("resources/illustrations/rat.png"),
+    image_portrait_rat = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\illustrations\\rat.png')),
                                                       (scale_portrait_w, scale_portrait_h))
     image_tile = []
     for i in range(10):
         image_tile.append(
-            pygame.transform.smoothscale(pygame.image.load("resources/gameElements/tile" + str(i + 1) + ".png"),
+            pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\gameElements\\tile' + str(i + 1) + '.png')),
                                          (scale, scale)))
     tiles = []
     for i in range(width):
