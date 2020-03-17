@@ -162,7 +162,6 @@ def init_coords_and_images(width, height, player1_is_alive, player2_is_alive, wi
     offset_y = max(25, window_height // 2 - int(scale * height / 2))
     scale_portrait_w = int(window_width / 6)
     scale_portrait_h = int(window_width / 6)
-    print(os.path.join(dirname, '..\\resources\\illustrations\\background.jpg'))
     image_background = pygame.transform.smoothscale(pygame.image.load(os.path.join(dirname, '..\\resources\\illustrations\\background.jpg')),
                                                     (window_width, window_height))
 
