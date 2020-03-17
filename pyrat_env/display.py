@@ -1,6 +1,5 @@
 import pygame
 
-
 class Rendering:
     def __init__(self, window_width=1920, window_height=1080):
         self.screen = None
