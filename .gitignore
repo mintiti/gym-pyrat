@@ -2,6 +2,8 @@
 # Created by https://www.gitignore.io/api/linux,pycharm,windows
 # Edit at https://www.gitignore.io/?templates=linux,pycharm,windows
 
+# Package info
+gym_pyrat.egg-info
 ### Linux ###
 *~
 .idea
