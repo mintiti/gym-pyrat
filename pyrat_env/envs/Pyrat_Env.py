@@ -205,6 +205,10 @@ class PyratEnv(gym.Env):
         self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
         self._cheese_matrix_from_list()
 
+        for start in self.maze:
+            for end in self.maze[start]:
+                self.maze[start][end] = 1
+
         return self._observation()
 
     # TODO : Rendering : maybe switch it to something better than pygame
