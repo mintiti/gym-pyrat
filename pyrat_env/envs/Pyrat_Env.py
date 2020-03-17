@@ -256,7 +256,7 @@ class PyratEnv(gym.Env):
         return dict({
             'Maze_up': self.maze_matrix_U,
             'Maze_right': self.maze_matrix_R,
-            'Maze_left': self.maze_matrix_L_,
+            'Maze_left': self.maze_matrix_L,
             'Maze_down': self.maze_matrix_D,
             'pieces_of_cheese': self.cheese_matrix,
             'player1_location': self.player1_location,
