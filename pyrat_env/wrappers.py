@@ -1,7 +1,8 @@
-from gym.core import ObservationWrapper,RewardWrapper
+from gym.core import ObservationWrapper, RewardWrapper
 import gym.spaces as spaces
 import numpy as np
-from gym.spaces import Box, Dict,Discrete, Tuple,MultiBinary,MultiDiscrete
+from gym.spaces import Box, Dict, Discrete, Tuple, MultiBinary, MultiDiscrete
+
 
 def flatdim2(space):
     if isinstance(space, Box):
@@ -19,6 +20,7 @@ def flatdim2(space):
     else:
         raise NotImplementedError
 
+
 def flatten2(space, x):
     if isinstance(space, Box):
         return np.asarray(x, dtype=np.float32).flatten()
@@ -35,8 +37,9 @@ def flatten2(space, x):
     else:
         raise NotImplementedError
 
+
 class FlattenObservationMatrices(ObservationWrapper):
-    def __init__(self,env):
+    def __init__(self, env):
         super(FlattenObservationMatrices, self).__init__(env)
 
         flatdim = flatdim2(env.observation_space)
@@ -45,11 +48,12 @@ class FlattenObservationMatrices(ObservationWrapper):
     def observation(self, observation):
         return flatten2(self.env.observation_space, observation)
 
+
 class MatricizePositions(ObservationWrapper):
-    def __init__(self,env):
+    def __init__(self, env):
         super(MatricizePositions, self).__init__(env)
 
-        obs_dim = (7,21,15)
+        obs_dim = (9, 21, 15)
         self.observation_space = Box(low=-float('inf'), high=float('inf'), shape=obs_dim, dtype=np.float32)
 
     def observation(self, observation):
@@ -59,11 +63,14 @@ class MatricizePositions(ObservationWrapper):
         ret.append(observation['Maze_left'])
         ret.append(observation['Maze_down'])
         ret.append(observation['pieces_of_cheese'])
-
+        player1_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player1_score'])
+        player2_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player2_score'])
+        ret.append(player1_score_matrix)
+        ret.append(player2_score_matrix)
 
         # player location matrices
         player1 = np.zeros(ret[0].shape)
-        player2 =  np.zeros(ret[0].shape)
+        player2 = np.zeros(ret[0].shape)
 
         player1[observation['player1_location']] = 1
         player2[observation['player2_location']] = 1
@@ -73,26 +80,25 @@ class MatricizePositions(ObservationWrapper):
 
         return np.array(ret)
 
+
 class FinalReward(RewardWrapper):
-    def __init__(self,env):
+    def __init__(self, env):
         super(FinalReward, self).__init__(env)
         self.cumulated_reward = 0
 
     def reward(self, reward):
         self.cumulated_reward += reward
 
-
     def step(self, action):
         observation, reward, done, info = self.env.step(action)
         self.reward(reward)
-        if done :
+        if done:
             reward = self.cumulated_reward / abs(self.cumulated_reward)
         else:
             reward = 0
 
-        return observation, reward,done, info
+        return observation, reward, done, info
 
 
-class AlphaZero(FinalReward, MatricizePositions):
-    def __init__(self,env):
-        super(AlphaZero, self).__init__(env)
+def AlphaZero(env):
+    return FinalReward(MatricizePositions(env))
