@@ -121,7 +121,7 @@ class PyratEnv(gym.Env):
         # Create the cheese matrix
         self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
         self._cheese_matrix_from_list()
-
+        #create the player score matrices
         self.action_space = spaces.Tuple([spaces.Discrete(4),
                                           spaces.Discrete(4)
                                           ])
@@ -133,6 +133,8 @@ class PyratEnv(gym.Env):
             'Maze_right': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'Maze_left': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
             'pieces_of_cheese': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
+            'player1_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
+            'player2_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
             'player1_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
             'player2_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
 
@@ -256,6 +258,7 @@ class PyratEnv(gym.Env):
         """
         dump(self, open(path, "wb"))
 
+
     def _observation(self):
         return dict({
             'Maze_up': self.maze_matrix_U,
@@ -263,6 +266,8 @@ class PyratEnv(gym.Env):
             'Maze_left': self.maze_matrix_L,
             'Maze_down': self.maze_matrix_D,
             'pieces_of_cheese': self.cheese_matrix,
+            'player1_score': self.player1_score,
+            'player2_score': self.player2_score,
             'player1_location': self.player1_location,
             'player2_location': self.player2_location,
         })
