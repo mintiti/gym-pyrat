@@ -1,8 +1,7 @@
-from gym.core import ObservationWrapper
+from gym.core import ObservationWrapper,RewardWrapper
 import gym.spaces as spaces
 import numpy as np
 from gym.spaces import Box, Dict,Discrete, Tuple,MultiBinary,MultiDiscrete
-
 
 def flatdim2(space):
     if isinstance(space, Box):
@@ -74,4 +73,26 @@ class MatricizePositions(ObservationWrapper):
 
         return np.array(ret)
 
+class FinalReward(RewardWrapper):
+    def __init__(self,env):
+        super(FinalReward, self).__init__(env)
+        self.cumulated_reward = 0
 
+    def reward(self, reward):
+        self.cumulated_reward += reward
+
+
+    def step(self, action):
+        observation, reward, done, info = self.env.step(action)
+        self.reward(reward)
+        if done :
+            reward = self.cumulated_reward / abs(self.cumulated_reward)
+        else:
+            reward = 0
+
+        return observation, reward,done, info
+
+
+class AlphaZero(FinalReward, MatricizePositions):
+    def __init__(self,env):
+        super(AlphaZero, self).__init__(env)
