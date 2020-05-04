@@ -8,6 +8,8 @@ from pickle import load, dump
 from ..imports.maze import *
 from ..imports.display import *
 from ..imports.parameters import *
+from ray.tune.utils.util import merge_dicts
+from gym.wrappers.flatten_observation import FlattenObservation
 
 # CONSTANTS
 DECISION_FROM_ACTION_DICT = {
@@ -16,6 +18,20 @@ DECISION_FROM_ACTION_DICT = {
     2: "R",
     3: 'D'
 }
+
+PYRAT_MULTIAGENT_DEFAULT_CONFIG = {
+    "width": 21,
+    "height": 15,
+    "nb_pieces_of_cheese": 41,
+    "max_turns": 1000,
+    "target_density": 0.7,
+    "connected": True,
+    "symmetry": True,
+    "mud_density": 0,
+    "mud_range": 10,
+    "maze_file": "",
+    "start_random": False,
+    "flatten" : False}
 
 
 class PyratMultiAgent(MultiAgentEnv):
@@ -63,13 +79,29 @@ class PyratMultiAgent(MultiAgentEnv):
     RAT = 1
     PYTHON = -1
 
-    def __init__(self, width=21, height=15, nb_pieces_of_cheese=41, max_turns=2000, target_density=0.7, connected=True,
-                 symmetry=True, mud_density=0, mud_range=10, maze_file="", start_random=False):
+    def __init__(self, env_config ):
+        dict = merge_dicts(PYRAT_MULTIAGENT_DEFAULT_CONFIG, env_config)
+
+        width = dict["width"]
+        height = dict["height"]
+        nb_pieces_of_cheese = dict["nb_pieces_of_cheese"]
+        max_turns = dict["max_turns"]
+        target_density = dict["target_density"]
+        connected = dict["connected"]
+        symmetry = dict["symmetry"]
+        mud_density = dict["mud_density"]
+        mud_range = dict["mud_range"]
+        maze_file = dict["maze_file"]
+        start_random = dict["start_random"]
+        self.flatten = dict["flatten"]
+
+
+
         self.rat = "rat"
         self.python = "python"
         # Precompute
-        self.RAT_matrix = np.full(( width, height), self.RAT)
-        self.PYTHON_matrix = np.full(( width, height), self.PYTHON)
+        self.RAT_matrix = np.full((width, height), self.RAT)
+        self.PYTHON_matrix = np.full((width, height), self.PYTHON)
 
         self.max_turns = max_turns
         self.target_density = target_density
@@ -118,13 +150,13 @@ class PyratMultiAgent(MultiAgentEnv):
         self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
         self._cheese_matrix_from_list()
         # create the player score matrices
-        self.action_space = spaces.Tuple([spaces.Discrete(4),
-                                          spaces.Discrete(4)
-                                          ])
+        self.action_space = spaces.Discrete(4)
 
         # Define the observation space
-        self.observation_space = spaces.Box(low=0, high=self.nb_pieces_of_cheese, shape=(10, self.width, self.height))
-
+        if not self.flatten:
+            self.observation_space = spaces.Box(low=0, high=self.nb_pieces_of_cheese, shape=(10, self.width, self.height))
+        else :
+            self.observation_space = spaces.Box(low=0, high= self.nb_pieces_of_cheese, shape= (10*self.width*self.height,))
         # Follow the play :
         self.player1_last_move = None
         self.player2_last_move = None
@@ -156,10 +188,11 @@ class PyratMultiAgent(MultiAgentEnv):
         # Calculate the return variables
         observations = self._observation()
         dones = self._check_done()
-        dones = {self.rat: dones,
-                 self.python: dones}
+        dones = {"__all__": dones}
         infos = {self.rat: dict(),
                  self.python: dict()}
+
+
 
         return observations, rewards, dones, infos
 
@@ -276,6 +309,13 @@ class PyratMultiAgent(MultiAgentEnv):
         canonical_board_rat.append(self.RAT_matrix)
         canonical_board_python.append(self.PYTHON_matrix)
 
+        canonical_board_rat = np.array(canonical_board_rat)
+        canonical_board_python = np.array(canonical_board_python)
+
+        if self.flatten:
+            canonical_board_rat = canonical_board_rat.flatten()
+            canonical_board_python = canonical_board_python.flatten()
+
         return dict({self.rat: np.array(canonical_board_rat),
                      self.python: np.array(canonical_board_python)
                      })
@@ -353,3 +393,5 @@ class PyratMultiAgent(MultiAgentEnv):
         elif delta == (-1, 0):
             direction = 'L'
         return direction
+
+
