@@ -63,14 +63,14 @@ class MatricizePositions(ObservationWrapper):
         ret.append(observation['Maze_left'])
         ret.append(observation['Maze_down'])
         ret.append(observation['pieces_of_cheese'])
-        player1_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player1_score'])
-        player2_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player2_score'])
+        player1_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player1_score'], dtype= np.float32)
+        player2_score_matrix = np.full_like(observation['pieces_of_cheese'], observation['player2_score'], dtype= np.float32)
         ret.append(player1_score_matrix)
         ret.append(player2_score_matrix)
 
         # player location matrices
-        player1 = np.zeros(ret[0].shape)
-        player2 = np.zeros(ret[0].shape)
+        player1 = np.zeros(ret[0].shape, dtype= np.float32)
+        player2 = np.zeros(ret[0].shape, dtype= np.float32)
 
         player1[observation['player1_location']] = 1
         player2[observation['player2_location']] = 1
@@ -78,7 +78,7 @@ class MatricizePositions(ObservationWrapper):
         ret.append(player1)
         ret.append(player2)
 
-        return np.array(ret)
+        return np.array(ret, dtype= np.float32)
 
 
 class FinalReward(RewardWrapper):
