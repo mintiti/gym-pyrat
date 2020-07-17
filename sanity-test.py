@@ -1,11 +1,12 @@
 import gym
 import pyrat_env
-from stable_baselines.common.env_checker import check_env
+from pyrat_env.envs import PyratEnv
+from stable_baselines3.common.env_checker import check_env
 import random
 from time import sleep
 
 if __name__ == '__main__':
-    env = gym.make("PyRatEnv-v0")
+    env = PyratEnv()
     check_env(env)
     # obs = env.reset()
     # env.render()

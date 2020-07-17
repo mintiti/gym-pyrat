@@ -1,5 +1,5 @@
 from pyrat_env.envs import Pyrat_Env
-from pyrat_env.wrappers import AlphaZero, MatricizePositions, FinalReward
+from pyrat_env.wrappers import AlphaZero, AlphaZeroMatricizePositions, FinalReward
 import gym
 import numpy as np
 import time
