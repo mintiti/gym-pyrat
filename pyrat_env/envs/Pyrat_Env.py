@@ -1,14 +1,11 @@
 # Imports
+import random
+import sys
 
 import gym
 from gym import spaces
-from ..pyrat import move
 import numpy as np
-from ..config import cfg
 from pickle import load, dump
-from ..imports.maze import *
-from ..imports.display import *
-from ..imports.parameters import *
 from abc import ABC
 
 # CONSTANTS
@@ -26,11 +23,11 @@ class GameGenerator:
     Most functions are ported from https://github.com/vgripon/PyRat/blob/master/imports/maze.py
 
     To get a maze :
-        >> maze_generator = GameGenerator()
-        >> width, height, maze, pieces_of_cheese,  player1_location, player2_location = maze_generator()"""
+        >> game_generator = GameGenerator()
+        >> state = game_generator()"""
 
     def __init__(self, width=21, height=15, nb_pieces_of_cheese=41, target_density=0.7, mud_density=0, connected=True,
-                 symmetry=True, mud_range=10, start_random=False, maze_file="", seed="random", max_turns = 2000):
+                 symmetry=True, mud_range=10, start_random=False, maze_file="", seed="random", max_turns=2000):
         """
         Initializes the maze generator
         Most arguments can take either a fixed value or can be sampled uniformly at random from a distribution.
@@ -141,7 +138,7 @@ class GameGenerator:
 
     def __call__(self):
         width, height, nb_pieces_of_cheese, target_density, mud_density, connected, symmetry, mud_range, start_random, maze_file, seed = self._sample_parameters()
-        width, height, maze, pieces_of_cheese,  player1_location, player2_location = self.maze_gen(width, height,
+        width, height, maze, pieces_of_cheese, player1_location, player2_location = self.maze_gen(width, height,
                                                                                                   nb_pieces_of_cheese,
                                                                                                   target_density,
                                                                                                   mud_density,
@@ -149,7 +146,8 @@ class GameGenerator:
                                                                                                   mud_range,
                                                                                                   start_random,
                                                                                                   maze_file, seed)
-        game_state = PyratState(width=width, height = height,maze = maze,pieces= pieces_of_cheese, player1_location = player1_location, player2_location= player2_location )
+        game_state = PyratState(width=width, height=height, maze=maze, pieces=pieces_of_cheese,
+                                player1_location=player1_location, player2_location=player2_location)
         return game_state
 
 
@@ -167,11 +165,16 @@ class PyratState:
         (-1, 0): "L",
         (0, 1): "U",
         (1, 0): "R",
-        (0, -1): "D"}
+        (0, -1): "D",
+        0: (-1, 0),
+        1: (0, 1),
+        2: (1, 0),
+        3: (0, -1),
+    }
 
-    def __init__(self, width=21, height=15, max_turns=2000, turns = 0,maze = {},
-                 pieces = [], player1_location = None,player1_score = 0, player1_moves = 0, player1_misses = 0,player1_mud = 0,
-                 player2_location = None, player2_score = 0, player2_moves = 0,player2_misses = 0,player2_mud = 0):
+    def __init__(self, width=21, height=15, max_turns=2000, turns=0, maze={},
+                 pieces=[], player1_location=None, player1_score=0, player1_moves=0, player1_misses=0, player1_mud=0,
+                 player2_location=None, player2_score=0, player2_moves=0, player2_misses=0, player2_mud=0):
         # Maze configs
         self.width = width
         self.height = height
@@ -210,20 +213,25 @@ class PyratState:
         # Check for cheese captures and calculate the new scores
         reward = self._capture_cheeses_and_update_scores()
 
-        return reward
+        done = self._check_done()
 
-    def set_state(self, state : dict):
+        return reward, done
+
+    def set_state(self, state: dict):
         assert self._valid_state_dict(state), f"Invalid state : state needs to contain keys {self.__dict__.keys()}"
         for k in self.__dict__.keys():
-            self.__setattr__(k,state[k])
+            self.__setattr__(k, state[k])
 
     def get_obs(self):
-        return self.__dict__
+        return self.__dict__.copy()
 
     def _move(self, decisions):
         p1_action, p2_action = decisions
         next_cell_p1, next_cell_p2 = np.add(self.player1_location, self.DIRECTION_DICT[p1_action]), np.add(
             self.player2_location, self.DIRECTION_DICT[p2_action])
+
+        next_cell_p1 = tuple(next_cell_p1)
+        next_cell_p2 = tuple(next_cell_p2)
 
         # Player 1
         # If the player is stuck in mud
@@ -274,13 +282,60 @@ class PyratState:
 
     def _check_done(self):
         return (self.turns >= self.max_turns) or (
-                self.player1_score > self.original_nb_cheeses /2) or (
-                self.player2_score > self.original_nb_cheeses /2)
+                self.player1_score > self.original_nb_cheeses / 2) or (
+                       self.player2_score > self.original_nb_cheeses / 2)
 
+    # State conversion methods
+    def get_maze_matrix(self):
+        """
+        Generates the maze matrix.
+        Returns 4 matrices of size self.width * self.height, which respectively indicate in cell [ij] whether you can go left, up, right, or down
+        on cell [ij]
+        :return : maze_matrix_L, maze_matrix_U, maze_matrix_R, maze_matrix_D
+        """
+        maze_dict = self.maze
+        maze_matrix_U = np.zeros((self.width, self.height), dtype=np.int8)
+        maze_matrix_D = np.zeros((self.width, self.height), dtype=np.int8)
+        maze_matrix_L = np.zeros((self.width, self.height), dtype=np.int8)
+        maze_matrix_R = np.zeros((self.width, self.height), dtype=np.int8)
+        for position in maze_dict:
+            for destination in maze_dict[position]:
+                direction = self._calculate_direction(position, destination)
+                if direction == 'U':
+                    maze_matrix_U[position[0], position[1]] = maze_dict[position][destination]
+                elif direction == 'D':
+                    maze_matrix_D[position[0], position[1]] = maze_dict[position][destination]
+                elif direction == 'R':
+                    maze_matrix_R[position[0], position[1]] = maze_dict[position][destination]
+                elif direction == 'L':
+                    maze_matrix_L[position[0], position[1]] = maze_dict[position][destination]
+
+        return maze_matrix_L, maze_matrix_U, maze_matrix_R, maze_matrix_D
+
+    def get_cheese_matrix(self) -> np.ndarray:
+        """Returns the matrix of size self.width * self.height, which indicates whether cell [ij] contains a cheese
+        :return cheese_matrix: matrix such as cheese_matrix[ij] = 1 if [ij] contains a cheese
+                                                                  0 else"""
+        cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
+        for cheese in self.pieces_of_cheese:
+            cheese_matrix[cheese] = 1
+        return cheese_matrix
 
     # Utility methods
+    def _calculate_direction(self, source, destination):
+        direction = None
+        delta = (destination[0] - source[0], destination[1] - source[1])
+        if delta == (0, 1):
+            direction = 'U'
+        elif delta == (0, -1):
+            direction = 'D'
+        elif delta == (1, 0):
+            direction = 'R'
+        elif delta == (-1, 0):
+            direction = 'L'
+        return direction
 
-    def _valid_state_dict(self,state : dict):
+    def _valid_state_dict(self, state: dict):
         valid = True
         for key in self.__dict__.keys():
             valid = valid and (key in state.keys())
@@ -483,19 +538,19 @@ class MazeGenerator:
             lines = content.split("\n")
             width = int(lines[0])
             height = int(lines[1])
-            maze = {}
+            self.maze = {}
             for i in range(width):
                 for j in range(height):
-                    maze[(i, j)] = {}
+                    self.maze[(i, j)] = {}
                     line = lines[i + j * width + 2].split(" ")
                     if line[0] != "0":
-                        maze[(i, j)][(i, j + 1)] = int(line[0])
+                        self.maze[(i, j)][(i, j + 1)] = int(line[0])
                     if line[1] != "0":
-                        maze[(i, j)][(i, j - 1)] = int(line[1])
+                        self.maze[(i, j)][(i, j - 1)] = int(line[1])
                     if line[2] != "0":
-                        maze[(i, j)][(i - 1, j)] = int(line[2])
+                        self.maze[(i, j)][(i - 1, j)] = int(line[2])
                     if line[3] != "0":
-                        maze[(i, j)][(i + 1, j)] = int(line[3])
+                        self.maze[(i, j)][(i + 1, j)] = int(line[3])
             line = lines[height * width + 2].split(" ")
             pieces_of_cheese = []
             for i in range(len(line)):
@@ -504,35 +559,35 @@ class MazeGenerator:
         else:
             random.seed(seed)
             # Start with purely random maze
-            maze = {};
+            self.maze = {};
             not_considered = {};
             for i in range(width):
                 for j in range(height):
-                    maze[(i, j)] = {}
+                    self.maze[(i, j)] = {}
                     not_considered[(i, j)] = True
             for i in range(width):
                 for j in range(height):
                     if not (symmetry) or not_considered[(i, j)]:
                         if random.uniform(0, 1) > target_density and i + 1 < width:
                             m = self.gen_mud(mud_density, mud_range)
-                            maze[(i, j)][(i + 1, j)] = m
-                            maze[(i + 1, j)][(i, j)] = m
+                            self.maze[(i, j)][(i + 1, j)] = m
+                            self.maze[(i + 1, j)][(i, j)] = m
                             if symmetry:
-                                maze[(width - 1 - i, height - 1 - j)][(width - 2 - i, height - 1 - j)] = m
-                                maze[(width - 2 - i, height - 1 - j)][(width - 1 - i, height - 1 - j)] = m
+                                self.maze[(width - 1 - i, height - 1 - j)][(width - 2 - i, height - 1 - j)] = m
+                                self.maze[(width - 2 - i, height - 1 - j)][(width - 1 - i, height - 1 - j)] = m
                         if random.uniform(0, 1) > target_density and j + 1 < height:
                             m = self.gen_mud(mud_density, mud_range)
-                            maze[(i, j)][(i, j + 1)] = m
-                            maze[(i, j + 1)][(i, j)] = m
+                            self.maze[(i, j)][(i, j + 1)] = m
+                            self.maze[(i, j + 1)][(i, j)] = m
                             if symmetry:
-                                maze[(width - 1 - i, height - 2 - j)][(width - 1 - i, height - 1 - j)] = m
-                                maze[(width - 1 - i, height - 1 - j)][(width - 1 - i, height - 2 - j)] = m
+                                self.maze[(width - 1 - i, height - 2 - j)][(width - 1 - i, height - 1 - j)] = m
+                                self.maze[(width - 1 - i, height - 1 - j)][(width - 1 - i, height - 2 - j)] = m
                         if symmetry:
                             not_considered[(i, j)] = False
                             not_considered[(width - 1 - i, height - 1 - j)] = False
             for i in range(width):
                 for j in range(height):
-                    if len(maze[(i, j)]) == 0 and (i == 0 or j == 0 or i == width - 1 or j == height - 1):
+                    if len(self.maze[(i, j)]) == 0 and (i == 0 or j == 0 or i == width - 1 or j == height - 1):
                         m = self.gen_mud(mud_density, mud_range)
                         possibilities = []
                         if i + 1 < width:
@@ -544,37 +599,37 @@ class MazeGenerator:
                         if j - 1 >= 0:
                             possibilities.append((i, j - 1))
                         chosen = possibilities[random.randrange(len(possibilities))]
-                        maze[(i, j)][chosen] = m
-                        maze[chosen][(i, j)] = m
+                        self.maze[(i, j)][chosen] = m
+                        self.maze[chosen][(i, j)] = m
                         if symmetry:
                             ii, jj = chosen
-                            maze[(width - 1 - i, height - 1 - j)][(width - 1 - ii, height - 1 - jj)] = m
-                            maze[(width - 1 - ii, height - 1 - jj)][(width - 1 - i, height - 1 - j)] = m
+                            self.maze[(width - 1 - i, height - 1 - j)][(width - 1 - ii, height - 1 - jj)] = m
+                            self.maze[(width - 1 - ii, height - 1 - jj)][(width - 1 - i, height - 1 - j)] = m
 
             # Then connect it
             if connected:
                 connected = [[0 for x in range(height)] for y in range(width)]
                 possible_border = [(0, height - 1)]
                 connected[0][height - 1] = 1
-                connected_region(maze, (0, height - 1), connected, possible_border)
+                self.connected_region((0, height - 1), connected, possible_border)
                 while 1:
                     border = []
                     new_possible_border = []
                     for (i, j) in possible_border:
                         is_candidate = False
-                        if not ((i + 1, j) in maze[(i, j)]) and i + 1 < width:
+                        if not ((i + 1, j) in self.maze[(i, j)]) and i + 1 < width:
                             if connected[i + 1][j] == 0:
                                 border.append(((i, j), (i + 1, j)))
                                 is_candidate = True
-                        if not ((i - 1, j) in maze[(i, j)]) and i > 0:
+                        if not ((i - 1, j) in self.maze[(i, j)]) and i > 0:
                             if connected[i - 1][j] == 0:
                                 border.append(((i, j), (i - 1, j)))
                                 is_candidate = True
-                        if not ((i, j + 1) in maze[(i, j)]) and j + 1 < height:
+                        if not ((i, j + 1) in self.maze[(i, j)]) and j + 1 < height:
                             if connected[i][j + 1] == 0:
                                 border.append(((i, j), (i, j + 1)))
                                 is_candidate = True
-                        if not ((i, j - 1) in maze[(i, j)]) and j > 0:
+                        if not ((i, j - 1) in self.maze[(i, j)]) and j > 0:
                             if connected[i][j - 1] == 0:
                                 border.append(((i, j), (i, j - 1)))
                                 is_candidate = True
@@ -585,27 +640,27 @@ class MazeGenerator:
                         break
                     a, b = border[random.randrange(len(border))]
                     m = self.gen_mud(mud_density, mud_range)
-                    maze[a][b] = m
-                    maze[b][a] = m
+                    self.maze[a][b] = m
+                    self.maze[b][a] = m
                     ai, aj = a
                     bi, bj = b
                     if symmetry:
                         bsym = (width - 1 - bi, height - 1 - bj)
                         asym = (width - 1 - ai, height - 1 - aj)
-                        maze[asym][bsym] = m
-                        maze[bsym][asym] = m
+                        self.maze[asym][bsym] = m
+                        self.maze[bsym][asym] = m
                     connected[bi][bj] = 1
-                    connected_region(maze, b, connected, possible_border)
+                    self.connected_region(b, connected, possible_border)
                     possible_border.append(b)
                     if symmetry:
                         if connected[width - 1 - bi][height - 1 - bj] == 0 and connected[width - 1 - ai][
                             height - 1 - aj] == 1:
                             connected[width - 1 - bi][height - 1 - bj] = 1
-                            connected_region(maze, bsym, connected, possible_border)
+                            self.connected_region(bsym, connected, possible_border)
                             possible_border.append(bsym)
             pieces_of_cheese = []
 
-        return width, height, pieces_of_cheese, maze
+        return width, height, pieces_of_cheese, self.maze
 
     def __call__(self, width, height, nb_pieces_of_cheese, target_density, mud_density, connected, symmetry, mud_range,
                  start_random, maze_file, seed):
@@ -627,8 +682,8 @@ class MazeGenerator:
 
 class PyratEnv(gym.Env):
     # TODO : add mud
+    # TODO : add redo rendering
     # TODO : code a replay system and a replayer
-    # TODO : recode the maze matrix to be 4 matrices indicating whether you can go up, down, to the right and to the left respectively
     """
     Description:
         2 agents compete in a maze for rewards randomly dispersed in the maze. The goal is to collect the most.
@@ -653,6 +708,14 @@ class PyratEnv(gym.Env):
             'pieces_of _cheese' :
                 Type :Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
                     A matrix where m_ij = 0 if there is no cheese on this bloc and 1 if there is
+
+            'turns' :
+                Type : Box(low=0, high= max_turns, shape=(1,), dtype=np.int)
+                    1 dimensional array containing the number of turns played
+
+            'max_turns' :
+                Type : Box(low=0, high= + inf, shape=(1,), dtype=np.int)
+                    Maximum number of turns allowed to be played
 
             'player1_location' :
                 Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
@@ -683,80 +746,25 @@ class PyratEnv(gym.Env):
         One player takes more than half of the cheeses available
     """
     # Gym API methods
-    metadata = {'render.modes': ['human', 'none']}
+    metadata = {'render.modes': ['human', 'none', 'text']}
     reward_range = (-1, 1)
 
     def __init__(self, width=21, height=15, nb_pieces_of_cheese=41, max_turns=2000, target_density=0.7, connected=True,
                  symmetry=True, mud_density=0.7, mud_range=10, maze_file="", start_random=False):
-        self.max_turns = max_turns
-        self.target_density = target_density
-        self.connected = connected
-        self.symmetry = symmetry
-        self.mud_density = mud_density
-        self.mud_range = mud_range
-        self.maze_file = maze_file
-        self.start_random = start_random
-        self.turn = 0
-        self.maze = None
-        self.maze_dimension = (width, height)
-        self.pieces_of_cheese = []
-        self.nb_pieces_of_cheese = nb_pieces_of_cheese
-        self.player1_location = None
-        self.player2_location = None
-        self.player1_score = 0
-        self.player2_score = 0
-        self.player1_misses = 0
-        self.player2_misses = 0
-        self.player1_moves = 0
-        self.player2_moves = 0
-        self.random_seed = random.randint(0, sys.maxsize)
-        self.width, self.height, self.pieces_of_cheese, self.maze = generate_maze(self.maze_dimension[0],
-                                                                                  self.maze_dimension[1],
-                                                                                  self.target_density,
-                                                                                  self.connected, self.symmetry,
-                                                                                  self.mud_density, self.mud_range,
-                                                                                  self.maze_file,
-                                                                                  self.random_seed)
-        self.pieces_of_cheese, self.player1_location, self.player2_location = generate_pieces_of_cheese(
-            self.nb_pieces_of_cheese, self.maze_dimension[0], self.maze_dimension[1],
-            self.symmetry,
-            self.player1_location,
-            self.player2_location,
-            self.start_random)
+        self.game_generator = GameGenerator(width=width, height=height, nb_pieces_of_cheese=nb_pieces_of_cheese,
+                                            max_turns=max_turns, target_density=target_density, connected=connected,
+                                            symmetry=symmetry, mud_density=mud_density, mud_range=mud_range,
+                                            maze_file=maze_file, start_random=start_random)
 
-        # Wrapper attributes
-        # Create the maze matrix
-        self.maze_matrix_U = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_D = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_R = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_L = np.zeros((self.width, self.height), dtype=np.int8)
-        self._maze_matrix_from_dict()
-        # Create the cheese matrix
-        self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
-        self._cheese_matrix_from_list()
-        # create the player score matrices
+        self.state = self.game_generator()
+
+        # Gym Interface
         self.action_space = spaces.Tuple([spaces.Discrete(4),
                                           spaces.Discrete(4)
                                           ])
 
         # Define the observation space
-        self.observation_space = spaces.Dict({
-            'Maze_up': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_down': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_right': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_left': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'pieces_of_cheese': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'player1_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
-            'player2_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
-            'player1_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
-            'player2_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
-
-        })
-
-        # Follow the play :
-        self.player1_last_move = None
-        self.player2_last_move = None
-        self.bg = None
+        self._set_obs_space()
 
     @classmethod
     def fromPickle(cls, p="./maze_files/maze.p"):
@@ -769,63 +777,17 @@ class PyratEnv(gym.Env):
         return load(open(p, 'rb'))
 
     def step(self, action):
-        self.turn += 1
-        # Perform both player's actions on the maze variables
-        decision1, decision2 = DECISION_FROM_ACTION_DICT[action[0]], DECISION_FROM_ACTION_DICT[action[1]]
-        self.player1_last_move = decision1
-        self.player2_last_move = decision2
-        self._move((decision1, decision2))
-
-        reward = self._calculate_reward()
-
+        reward, done = self.state.step(action)
         # Calculate the return variables
         observation = self._observation()
-        done = self._check_done()
         info = dict()
 
         return observation, reward, done, info
 
     def reset(self):
-        # reset the maze randomly
-        self.random_seed = random.randint(0, sys.maxsize)
-        self.turn = 0
-        self.pieces_of_cheese = []
-        self.width, self.height, self.pieces_of_cheese, self.maze = generate_maze(self.maze_dimension[0],
-                                                                                  self.maze_dimension[1],
-                                                                                  self.target_density,
-                                                                                  self.connected, self.symmetry,
-                                                                                  self.mud_density, self.mud_range,
-                                                                                  self.maze_file,
-                                                                                  self.random_seed)
-        self.pieces_of_cheese, self.player1_location, self.player2_location = generate_pieces_of_cheese(
-            self.nb_pieces_of_cheese,
-            self.maze_dimension[
-                0],
-            self.maze_dimension[
-                1],
-            self.symmetry,
-            self.player1_location,
-            self.player2_location,
-            self.start_random)
-        # Reset player turns, score, misses
-        self.player1_score, self.player2_score, self.player1_misses, self.player2_misses, self.player1_moves, self.player2_moves = 0, 0, 0, 0, 0, 0
-        self.player1_last_move = None
-        self.player2_last_move = None
-        self.bg = None
-        # Reset wrapper attributes
-        # Create the maze matrix
-        self.maze_matrix_U = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_D = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_R = np.zeros((self.width, self.height), dtype=np.int8)
-        self.maze_matrix_L = np.zeros((self.width, self.height), dtype=np.int8)
-        self._maze_matrix_from_dict()
-        # Create the cheese matrix
-        self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
-        self._cheese_matrix_from_list()
-
-        for start in self.maze:
-            for end in self.maze[start]:
-                self.maze[start][end] = 1
+        self.state = self.game_generator()
+        # Set the observation space
+        self._set_obs_space()
 
         return self._observation()
 
@@ -864,6 +826,9 @@ class PyratEnv(gym.Env):
         elif mode == "none":
             pass
 
+        elif mode == "text":
+            print(self.state)
+
     # Utils methods
 
     def save_pickle(self, path="./maze_files/maze_save.p"):
@@ -875,95 +840,68 @@ class PyratEnv(gym.Env):
         dump(self, open(path, "wb"))
 
     def _observation(self):
+        """Creates the observation"""
+        # get the unformatted observation from the state
+        raw_obs = self.state.get_obs()
+        # Create the maze matrices
+        maze_matrix_L, maze_matrix_U, maze_matrix_R, maze_matrix_D = self.state.get_maze_matrix()
+        # Create the cheese matrix
+        cheese_matrix = self.state.get_cheese_matrix()
+
         return dict({
-            'Maze_up': self.maze_matrix_U,
-            'Maze_right': self.maze_matrix_R,
-            'Maze_left': self.maze_matrix_L,
-            'Maze_down': self.maze_matrix_D,
-            'pieces_of_cheese': self.cheese_matrix,
-            'player1_score': self.player1_score,
-            'player2_score': self.player2_score,
-            'player1_location': self.player1_location,
-            'player2_location': self.player2_location,
+            # Global infos
+            'Maze_up': maze_matrix_U,
+            'Maze_right': maze_matrix_R,
+            'Maze_left': maze_matrix_L,
+            'Maze_down': maze_matrix_D,
+            'pieces_of_cheese': cheese_matrix,
+
+            'turns': np.array([raw_obs["turns"]], dtype=np.int),
+            'max_turns': np.array([raw_obs['max_turns']], dtype=np.int),
+
+            # Player 1 variables
+            'player1_score': np.array([raw_obs["player1_score"]]),
+            'player1_location': np.array(raw_obs["player1_location"], dtype=np.int),
+            'player1_moves': np.array([raw_obs["player1_moves"]], dtype=np.int),
+            'player1_misses': np.array([raw_obs["player1_misses"]], dtype=np.int),
+            'player1_mud': np.array([raw_obs["player1_mud"]], dtype=np.int),
+
+            # Player 2 variables
+            'player2_score': np.array([raw_obs["player2_score"]]),
+            'player2_location': np.array(raw_obs["player2_location"], dtype=np.int),
+            'player2_moves': np.array([raw_obs["player2_moves"]], dtype=np.int),
+            'player2_misses': np.array([raw_obs["player2_misses"]], dtype=np.int),
+            'player2_mud': np.array([raw_obs["player2_mud"]], dtype=np.int),
         })
 
-    def matrix_index_to_pos(self, index):
-        # noinspection PyRedundantParentheses
-        return (index % self.width, index // self.width)
+    def _set_obs_space(self):
+        self.observation_space = spaces.Dict({
+            # Global infos
+            'Maze_up': spaces.Box(low=0, high=1, shape=(self.state.width, self.state.height), dtype=np.int8),
+            'Maze_down': spaces.Box(low=0, high=1, shape=(self.state.width, self.state.height), dtype=np.int8),
+            'Maze_right': spaces.Box(low=0, high=1, shape=(self.state.width, self.state.height), dtype=np.int8),
+            'Maze_left': spaces.Box(low=0, high=1, shape=(self.state.width, self.state.height), dtype=np.int8),
+            'pieces_of_cheese': spaces.Box(low=0, high=1, shape=(self.state.width, self.state.height), dtype=np.int8),
 
-    def pos_to_matrix_index(self, pos):
-        return pos[1] * self.width + pos[0]
+            'turns': spaces.Box(low=0, high=self.state.max_turns, shape=(1,), dtype=np.int),
+            'max_turns': spaces.Box(low=0, high=np.iinfo(np.int64).max, shape=(1,), dtype=np.int),
 
-    def _maze_matrix_from_dict(self):
-        """
-        Generates the maze matrix
-        :return:
-        """
-        maze_dict = self.maze
-        for position in maze_dict:
-            for destination in maze_dict[position]:
-                direction = self._calculate_direction(position, destination)
-                if direction == 'U':
-                    self.maze_matrix_U[position[0], position[1]] = 1
-                elif direction == 'D':
-                    self.maze_matrix_D[position[0], position[1]] = 1
-                elif direction == 'R':
-                    self.maze_matrix_R[position[0], position[1]] = 1
-                elif direction == 'L':
-                    self.maze_matrix_L[position[0], position[1]] = 1
+            # Player 1 variables
+            'player1_score': spaces.Box(low=0, high=self.state.original_nb_cheeses, shape=(1,)),
+            'player1_location': spaces.Box(low=np.array([0, 0]),
+                                           high=np.array([self.state.width - 1, self.state.height - 1]), shape=(2,),
+                                           dtype=np.int),
+            'player1_moves': spaces.Box(low=0, high=self.state.max_turns, shape=(1,), dtype=np.int),
+            'player1_misses': spaces.Box(low=0, high=self.state.max_turns, shape=(1,), dtype=np.int),
+            'player1_mud': spaces.Box(low=0, high=100, shape=(1,), dtype=np.int),
 
-    def _cheese_matrix_from_list(self):
-        for cheese in self.pieces_of_cheese:
-            self.cheese_matrix[cheese] = 1
+            # Player 2 variables
+            'player2_score': spaces.Box(low=0, high=self.state.original_nb_cheeses, shape=(1,)),
+            'player2_location': spaces.Box(low=np.array([0, 0]),
+                                           high=np.array([self.state.width - 1, self.state.height - 1]), shape=(2,),
+                                           dtype=np.int),
+            'player2_moves': spaces.Box(low=0, high=self.state.max_turns, shape=(1,), dtype=np.int),
+            'player2_misses': spaces.Box(low=0, high=self.state.max_turns, shape=(1,), dtype=np.int),
+            'player2_mud': spaces.Box(low=0, high=100, shape=(1,), dtype=np.int),
 
-    def _calculate_reward(self):
-        """
-        Returns the reward for the current turn and removes the potential cheeses that have been eaten
-        reward is 1 if the player 1 eats a piece of cheese and player 2 doesnt, -1 if player 2 does and player 1 doesnt and 0 in all other cases
-        :return: reward
-        """
-        reward = 0
-        if self.player1_location in self.pieces_of_cheese:
-            self.pieces_of_cheese.remove(self.player1_location)
-            self.cheese_matrix[self.player1_location] = 0
-            if self.player2_location == self.player1_location:
-                self.player2_score += 0.5
-                self.player1_score += 0.5
-                # reward = 0
-            else:
-                self.player1_score += 1
-                reward = 1
-        if self.player2_location in self.pieces_of_cheese:
-            self.pieces_of_cheese.remove(self.player2_location)
-            self.cheese_matrix[self.player2_location] = 0
-            self.player2_score += 1
-            reward = -1
-        return reward
-
-    def _move(self, action):
-        """
-        imports.maze.move function wrapper
-        :param action: (decision1,decision2) of both players
-        """
-        (decision1, decision2) = action
-        self.player1_location, self.player2_location, stuck1, stuck2, self.player1_moves, self.player2_moves, self.player1_misses, self.player2_misses = move(
-            decision1, decision2, self.maze, self.player1_location, self.player2_location, 0, 0, self.player1_moves,
-            self.player2_moves, self.player1_misses, self.player2_misses)
-
-    def _check_done(self):
-        # noinspection PyRedundantParentheses,PyRedundantParentheses
-        return (self.turn >= self.max_turns) or (self.player1_score > (self.nb_pieces_of_cheese) / 2) or (
-                self.player2_score > (self.nb_pieces_of_cheese) / 2)
-
-    def _calculate_direction(self, source, destination):
-        direction = None
-        delta = (destination[0] - source[0], destination[1] - source[1])
-        if delta == (0, 1):
-            direction = 'U'
-        elif delta == (0, -1):
-            direction = 'D'
-        elif delta == (1, 0):
-            direction = 'R'
-        elif delta == (-1, 0):
-            direction = 'L'
-        return direction
+        })
