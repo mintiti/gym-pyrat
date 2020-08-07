@@ -3,7 +3,7 @@ from pyrat_env.wrappers import AlphaZero, AlphaZeroMatricizePositions, FinalRewa
 import gym
 import numpy as np
 import time
-import tensorflow as tf
+
 if __name__ == '__main__':
     print(tf.test.is_gpu_available())
     env = gym.make("PyRatEnv-v0")

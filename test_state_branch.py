@@ -1,6 +1,7 @@
 import random
 
-from pyrat_env.envs.Pyrat_Env import IntParameter, FloatParameter, BooleanParameter, GameGenerator, MazeGenerator, PyratEnv
+from pyrat_env.envs.Pyrat_Env import PyratEnv
+from pyrat_env.envs.core import GameGenerator, BooleanParameter, FloatParameter, IntParameter, MazeGenerator
 from stable_baselines3.common.env_checker import check_env
 
 import time
@@ -228,4 +229,5 @@ def test_time():
     print(f"average time for a step : {mean} over {nb_trials} trials")
 
 if __name__ == '__main__':
-    test_time()
+    test_maze_gen()
+
