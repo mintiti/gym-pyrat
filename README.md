@@ -49,3 +49,8 @@ env = PyratEnv(nb_pieces_of_cheese = [20,41])
 ```
 
 For more details, please refer to the [GameGenerator class](https://github.com/mintiti/gym-pyrat/blob/092935a27e50b0238a8f57dc05242071b4ec67cc/pyrat/envs/core.py#L553) documentation
+
+## Future improvements
+- Wrapper to make the observation space a stack of planes to enable CNN usage.
+- [RLlib Multiagent implementation](https://docs.ray.io/en/master/rllib-env.html#multi-agent-and-hierarchical)
+- [Muzero General wrapper](https://github.com/werner-duvaud/muzero-general)
