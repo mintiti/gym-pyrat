@@ -1,5 +1,4 @@
-# Imports
-
+from ray.rllib.env import MultiAgentEnv
 import gym
 from gym import spaces
 from ..pyrat import move
@@ -9,6 +8,8 @@ from pickle import load, dump
 from ..imports.maze import *
 from ..imports.display import *
 from ..imports.parameters import *
+from ray.tune.utils.util import merge_dicts
+from gym.wrappers.flatten_observation import FlattenObservation
 
 # CONSTANTS
 DECISION_FROM_ACTION_DICT = {
@@ -18,44 +19,39 @@ DECISION_FROM_ACTION_DICT = {
     3: 'D'
 }
 
+PYRAT_MULTIAGENT_DEFAULT_CONFIG = {
+    "width": 21,
+    "height": 15,
+    "nb_pieces_of_cheese": 41,
+    "max_turns": 1000,
+    "target_density": 0.7,
+    "connected": True,
+    "symmetry": True,
+    "mud_density": 0,
+    "mud_range": 10,
+    "maze_file": "",
+    "start_random": False,
+    "flatten" : False}
 
-class PyratEnv(gym.Env):
+
+class PyratMultiAgent(MultiAgentEnv):
     # TODO : add mud
     # TODO : code a replay system and a replayer
-    # TODO : recode the maze matrix to be 4 matrices indicating whether you can go up, down, to the right and to the left respectively
     """
     Description:
         2 agents compete in a maze for rewards randomly dispersed in the maze. The goal is to collect the most.
     Observation:
-        Type: Dict({
-            'Maze_up':
-                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                    A matrix [M_ij] where M_ij = 1 if you can go up from case ij
-
-            'Maze_down':
-                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                    A matrix [M_ij] where M_ij = 1 if you can go down from case ij
-
-            'Maze_right':
-                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                    A matrix [M_ij] where M_ij = 1 if you can go right from case ij
-
-            'Maze_left':
-                Type : Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                    A matrix [M_ij] where M_ij = 1 if you can go left from case ij
-
-            'pieces_of _cheese' :
-                Type :Box( low= 0 , high =1, shape = (maze_width, maze_height), dtype = np.int8)
-                    A matrix where m_ij = 0 if there is no cheese on this bloc and 1 if there is
-
-            'player1_location' :
-                Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
-                    The location of player 1
-
-            'player2_location' :
-                Type : Tuple ( Discrete(maze_width), Discrete(maze_height))
-                    The location of player 2
-        })
+                - array of size (10,21,15) with each layer containing :
+                            0) Maze_left
+                            1) Maze_up
+                            2) Maze_right
+                            3) Maze_down
+                            4) Pieces of cheese location
+                            5) Player 1 score
+                            6) Player 2 score
+                            7) Player 1 location
+                            8) Player 2 location
+                            9) Player perspective plane
 
     Actions:
         Type: Tuple( Discrete(4), Discrete(4))
@@ -80,7 +76,33 @@ class PyratEnv(gym.Env):
     metadata = {'render.modes': ['human', 'none']}
     reward_range = (-1, 1)
 
-    def __init__(self, width=21, height=15, nb_pieces_of_cheese=41, max_turns=2000, target_density = 0.7, connected= True, symmetry = True, mud_density = 0.7, mud_range = 10, maze_file = "", start_random = False):
+    RAT = 1
+    PYTHON = -1
+
+    def __init__(self, env_config):
+        dict = merge_dicts(PYRAT_MULTIAGENT_DEFAULT_CONFIG, env_config)
+
+        width = dict["width"]
+        height = dict["height"]
+        nb_pieces_of_cheese = dict["nb_pieces_of_cheese"]
+        max_turns = dict["max_turns"]
+        target_density = dict["target_density"]
+        connected = dict["connected"]
+        symmetry = dict["symmetry"]
+        mud_density = dict["mud_density"]
+        mud_range = dict["mud_range"]
+        maze_file = dict["maze_file"]
+        start_random = dict["start_random"]
+        self.flatten = dict["flatten"]
+
+
+
+        self.rat = "rat"
+        self.python = "python"
+        # Precompute
+        self.RAT_matrix = np.full((width, height), self.RAT)
+        self.PYTHON_matrix = np.full((width, height), self.PYTHON)
+
         self.max_turns = max_turns
         self.target_density = target_density
         self.connected = connected
@@ -103,9 +125,12 @@ class PyratEnv(gym.Env):
         self.player1_moves = 0
         self.player2_moves = 0
         self.random_seed = random.randint(0, sys.maxsize)
-        self.width, self.height, self.pieces_of_cheese, self.maze = generate_maze(self.maze_dimension[0], self.maze_dimension[1], self.target_density,
+        self.width, self.height, self.pieces_of_cheese, self.maze = generate_maze(self.maze_dimension[0],
+                                                                                  self.maze_dimension[1],
+                                                                                  self.target_density,
                                                                                   self.connected, self.symmetry,
-                                                                                  self.mud_density, self.mud_range, self.maze_file,
+                                                                                  self.mud_density, self.mud_range,
+                                                                                  self.maze_file,
                                                                                   self.random_seed)
         self.pieces_of_cheese, self.player1_location, self.player2_location = generate_pieces_of_cheese(
             self.nb_pieces_of_cheese, self.maze_dimension[0], self.maze_dimension[1],
@@ -124,25 +149,14 @@ class PyratEnv(gym.Env):
         # Create the cheese matrix
         self.cheese_matrix = np.zeros((self.width, self.height), dtype=np.int8)
         self._cheese_matrix_from_list()
-        #create the player score matrices
-        self.action_space = spaces.Tuple([spaces.Discrete(4),
-                                          spaces.Discrete(4)
-                                          ])
+        # create the player score matrices
+        self.action_space = spaces.Discrete(4)
 
         # Define the observation space
-        self.observation_space = spaces.Dict({
-            'Maze_up': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_down': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_right': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'Maze_left': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'pieces_of_cheese': spaces.Box(low=0, high=1, shape=(self.width, self.height), dtype=np.int8),
-            'player1_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
-            'player2_score': spaces.Box(low=0, high=nb_pieces_of_cheese, shape=(1,)),
-            'player1_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
-            'player2_location': spaces.Tuple([spaces.Discrete(self.width), spaces.Discrete(self.height)]),
-
-        })
-
+        if not self.flatten:
+            self.observation_space = spaces.Box(low=0, high=self.nb_pieces_of_cheese, shape=(10, self.width, self.height))
+        else :
+            self.observation_space = spaces.Box(low=0, high= self.nb_pieces_of_cheese, shape= (10*self.width*self.height,))
         # Follow the play :
         self.player1_last_move = None
         self.player2_last_move = None
@@ -158,22 +172,29 @@ class PyratEnv(gym.Env):
         """
         return load(open(p, 'rb'))
 
-    def step(self, action):
+    def step(self, action_dict):
         self.turn += 1
         # Perform both player's actions on the maze variables
-        decision1, decision2 = DECISION_FROM_ACTION_DICT[action[0]], DECISION_FROM_ACTION_DICT[action[1]]
+        decision1, decision2 = DECISION_FROM_ACTION_DICT[action_dict[self.rat]], DECISION_FROM_ACTION_DICT[
+            action_dict[self.python]]
         self.player1_last_move = decision1
         self.player2_last_move = decision2
         self._move((decision1, decision2))
 
-        reward = self._calculate_reward()
+        rewards = self._calculate_reward()
+        rewards = {self.rat: rewards,
+                   self.python: -rewards}
 
         # Calculate the return variables
-        observation = self._observation()
-        done = self._check_done()
-        info = dict()
+        observations = self._observation()
+        dones = self._check_done()
+        dones = {"__all__": dones}
+        infos = {self.rat: dict(),
+                 self.python: dict()}
 
-        return observation, reward, done, info
+
+
+        return observations, rewards, dones, infos
 
     def reset(self):
         # reset the maze randomly
@@ -181,19 +202,22 @@ class PyratEnv(gym.Env):
         self.turn = 0
         self.pieces_of_cheese = []
         self.width, self.height, self.pieces_of_cheese, self.maze = generate_maze(self.maze_dimension[0],
-                                                                                  self.maze_dimension[1], self.target_density,
+                                                                                  self.maze_dimension[1],
+                                                                                  self.target_density,
                                                                                   self.connected, self.symmetry,
-                                                                                  self.mud_density, self.mud_range, self.maze_file,
+                                                                                  self.mud_density, self.mud_range,
+                                                                                  self.maze_file,
                                                                                   self.random_seed)
-        self.pieces_of_cheese, self.player1_location, self.player2_location = generate_pieces_of_cheese(self.nb_pieces_of_cheese,
-                                                                                                        self.maze_dimension[
-                                                                                                            0],
-                                                                                                        self.maze_dimension[
-                                                                                                            1],
-                                                                                                        self.symmetry,
-                                                                                                        self.player1_location,
-                                                                                                        self.player2_location,
-                                                                                                        self.start_random)
+        self.pieces_of_cheese, self.player1_location, self.player2_location = generate_pieces_of_cheese(
+            self.nb_pieces_of_cheese,
+            self.maze_dimension[
+                0],
+            self.maze_dimension[
+                1],
+            self.symmetry,
+            self.player1_location,
+            self.player2_location,
+            self.start_random)
         # Reset player turns, score, misses
         self.player1_score, self.player2_score, self.player1_misses, self.player2_misses, self.player1_moves, self.player2_moves = 0, 0, 0, 0, 0, 0
         self.player1_last_move = None
@@ -216,8 +240,6 @@ class PyratEnv(gym.Env):
 
         return self._observation()
 
-    # TODO : Rendering : maybe switch it to something better than pygame
-    # TODO : Sound
     def render(self, mode='human'):
         if mode == 'human':
             (window_width, window_height) = cfg['resolution']
@@ -261,26 +283,42 @@ class PyratEnv(gym.Env):
         """
         dump(self, open(path, "wb"))
 
-
     def _observation(self):
-        return dict({
-            'Maze_up': self.maze_matrix_U,
-            'Maze_right': self.maze_matrix_R,
-            'Maze_left': self.maze_matrix_L,
-            'Maze_down': self.maze_matrix_D,
-            'pieces_of_cheese': self.cheese_matrix,
-            'player1_score': self.player1_score,
-            'player2_score': self.player2_score,
-            'player1_location': self.player1_location,
-            'player2_location': self.player2_location,
-        })
+        canonical_board = []
+        canonical_board.append(self.maze_matrix_L)
+        canonical_board.append(self.maze_matrix_U)
+        canonical_board.append(self.maze_matrix_R)
+        canonical_board.append(self.maze_matrix_D)
+        canonical_board.append(self.cheese_matrix)
+        canonical_board.append(np.full_like(self.maze_matrix_R, self.player1_score))
+        canonical_board.append(np.full_like(self.maze_matrix_R, self.player2_score))
 
-    def matrix_index_to_pos(self, index):
-        # noinspection PyRedundantParentheses
-        return (index % self.width, index // self.width)
+        # make the player 1 position matrix
+        player1_position_matrix = np.zeros_like(self.maze_matrix_L)
+        player1_position_matrix[self.player1_location] = 1
+        # make the player 2 position matrix
+        player2_position_matrix = np.zeros_like(self.maze_matrix_L)
+        player2_position_matrix[self.player2_location] = 1
 
-    def pos_to_matrix_index(self, pos):
-        return pos[1] * self.width + pos[0]
+        canonical_board.append(player1_position_matrix)
+        canonical_board.append(player2_position_matrix)
+
+        canonical_board_rat = canonical_board
+        canonical_board_python = canonical_board.copy()
+
+        canonical_board_rat.append(self.RAT_matrix)
+        canonical_board_python.append(self.PYTHON_matrix)
+
+        canonical_board_rat = np.array(canonical_board_rat)
+        canonical_board_python = np.array(canonical_board_python)
+
+        if self.flatten:
+            canonical_board_rat = canonical_board_rat.flatten()
+            canonical_board_python = canonical_board_python.flatten()
+
+        return dict({self.rat: np.array(canonical_board_rat),
+                     self.python: np.array(canonical_board_python)
+                     })
 
     def _maze_matrix_from_dict(self):
         """
@@ -355,3 +393,5 @@ class PyratEnv(gym.Env):
         elif delta == (-1, 0):
             direction = 'L'
         return direction
+
+
