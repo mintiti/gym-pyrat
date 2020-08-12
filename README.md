@@ -3,13 +3,8 @@ Refactoring on the original game [PyRat](https://github.com/vgripon/PyRat), from
 This makes it compliant to the Gym API.
 
 ## Game
-2 rats are in a symmetrical maze and are competing for cheese pieces.  
+2 rats are in a maze and are competing for cheese pieces.  
 Player with the most cheese pieces at the end of the game wins.
-
-## Installation 
-```bash
-pip install pyrat-env
-```
 
 
 ### Dependencies
@@ -18,4 +13,16 @@ You will need :
 * numpy
 * pygame
 
-Benji
+## Installation 
+Recommended installation : 
+while being in the gym-pyrat directory :
+```bash
+pip install -e .
+```
+
+## Included environments
+| Environment                    | Implemented        | Number of players | Observation space     | Action space                   | Other                                                                                 |
+|--------------------------------|--------------------|-------------------|-----------------------|--------------------------------|---------------------------------------------------------------------------------------|
+| PyratEnv-v0                    | :heavy_check_mark: | 2                 | Dict containing Boxes | Tuple(Discrete(4),Discrete(4)) | Base Env                                                |
+| PyratEnvNoMudVsGreedy-v0       | :heavy_check_mark: | 1                 | Dict containing Boxes | Discrete(4)                    | Same as PyratEnv-v0, but the agent plays against greedy, and there is no mud          |
+| PyratEnvNoMudNoWallVsGreedy-v0 | :x:                | 1                 | Dict containing Boxes | Discrete(4)                    | Same as PyratEnv-v0, but the agent plays against greedy, and there is no mud or walls |
