@@ -1,6 +1,6 @@
 import gym
-import pyrat_env
-from pyrat_env.envs import PyratEnv
+import pyrat
+from pyrat.envs import PyratEnv
 from stable_baselines3.common.env_checker import check_env
 import random
 from time import sleep

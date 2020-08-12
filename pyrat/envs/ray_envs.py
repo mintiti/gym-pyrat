@@ -79,7 +79,7 @@ class PyratMultiAgent(MultiAgentEnv):
     RAT = 1
     PYTHON = -1
 
-    def __init__(self, env_config ):
+    def __init__(self, env_config):
         dict = merge_dicts(PYRAT_MULTIAGENT_DEFAULT_CONFIG, env_config)
 
         width = dict["width"]

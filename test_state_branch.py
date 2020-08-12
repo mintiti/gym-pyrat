@@ -1,7 +1,7 @@
 import random
 
-from pyrat_env.envs.Pyrat_Env import PyratEnv
-from pyrat_env.envs.core import GameGenerator, BooleanParameter, FloatParameter, IntParameter, MazeGenerator
+from pyrat.envs.Pyrat_Env import PyratEnv, PyratEnvNoMudVsGreedy
+from pyrat.envs.core import GameGenerator, BooleanParameter, FloatParameter, IntParameter, MazeGenerator
 from stable_baselines3.common.env_checker import check_env
 
 import time
@@ -159,6 +159,7 @@ def test_env():
     env = PyratEnv(**args)
     print(env.action_space)
     print(env.observation_space)
+    print(f"len of duct is {len(env.observation_space.spaces)}")
     #test reset
     obs = env.reset()
     # print(obs)
@@ -223,11 +224,26 @@ def time_steps(env,nb_trials):
 def test_time():
     args = dict(width=21, height=15, nb_pieces_of_cheese=10, target_density=0.7, mud_density=0, connected=True,
                 symmetry=True, mud_range=10, start_random=False)
-    env = PyratEnv(**args)
+    env = PyratEnvNoMudVsGreedy(**args)
     nb_trials = 10000
     mean = time_steps(env,nb_trials)
     print(f"average time for a step : {mean} over {nb_trials} trials")
 
+def test_wrapper():
+    args = dict(width=21, height=15, nb_pieces_of_cheese=[20, 41], target_density=0, connected=True,
+                symmetry=True, start_random=True)
+
+    env  = PyratEnvNoMudVsGreedy(**args)
+
+    print(f"wrapped env action space is {env.action_space} and obs space is {env.observation_space}")
+    for i in range(100):
+        action = env.action_space.sample()
+        obs,r, done,_ =  env.step(action)
+        print(f"action chosen {action}")
+        env.render(mode = "text")
+        if done:
+            break
+
 if __name__ == '__main__':
-    test_maze_gen()
+    test_wrapper()
 

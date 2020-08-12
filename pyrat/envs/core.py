@@ -85,7 +85,7 @@ class IntParameter(MazeParameter):
     def sample(self):
         return self.sampler()
 
-git
+
 class PyratState:
     # TODO : Everything in numpy for speed
     """

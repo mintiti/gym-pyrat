@@ -4,9 +4,8 @@ import gym
 from gym import spaces
 import numpy as np
 from pickle import load, dump
-
-# CONSTANTS
-from pyrat_env.envs.core import GameGenerator
+from pyrat.envs.core import GameGenerator
+from ..wrappers import VsGreedyNoMud
 
 DECISION_FROM_ACTION_DICT = {
     0: 'L',
@@ -131,33 +130,34 @@ class PyratEnv(gym.Env):
     # TODO : Sound
     def render(self, mode='human'):
         if mode == 'human':
-            (window_width, window_height) = cfg['resolution']
-            scale, offset_x, offset_y, image_background, image_cheese, image_corner, image_moving_python, image_moving_rat, image_python, image_rat, image_wall, image_mud, image_portrait_python, image_portrait_rat, tiles, image_tile = init_coords_and_images(
-                self.width, self.height, True, True, window_width, window_height)
-            if self.bg is None:
-                pygame.init()
-                screen = pygame.display.set_mode(cfg['resolution'])
-                self.bg = build_background(screen, self.maze, tiles, image_background, image_tile, image_wall,
-                                           image_corner,
-                                           image_mud,
-                                           offset_x, offset_y, self.width, self.height, window_width, window_height,
-                                           image_portrait_rat,
-                                           image_portrait_python, scale, True, True)
-            screen = pygame.display.get_surface()
-            screen.blit(self.bg, (0, 0))
-            draw_pieces_of_cheese(self.pieces_of_cheese, image_cheese, offset_x, offset_y, scale, self.width,
-                                  self.height, screen,
-                                  window_height)
-            draw_players(self.player1_location, self.player2_location, image_rat, image_python, offset_x, offset_y,
-                         scale, self.width,
-                         self.height, screen, window_height)
-            draw_scores("Rat", self.player1_score, image_portrait_rat, "Python", self.player2_score,
-                        image_portrait_python, window_width,
-                        window_height, screen, True, True, self.player1_last_move, self.player1_misses,
-                        self.player2_last_move, self.player2_misses, 0,
-                        0)
-            pygame.display.update()
-            pygame.event.get()
+            pass
+            # (window_width, window_height) = cfg['resolution']
+            # scale, offset_x, offset_y, image_background, image_cheese, image_corner, image_moving_python, image_moving_rat, image_python, image_rat, image_wall, image_mud, image_portrait_python, image_portrait_rat, tiles, image_tile = init_coords_and_images(
+            #     self.width, self.height, True, True, window_width, window_height)
+            # if self.bg is None:
+            #     pygame.init()
+            #     screen = pygame.display.set_mode(cfg['resolution'])
+            #     self.bg = build_background(screen, self.maze, tiles, image_background, image_tile, image_wall,
+            #                                image_corner,
+            #                                image_mud,
+            #                                offset_x, offset_y, self.width, self.height, window_width, window_height,
+            #                                image_portrait_rat,
+            #                                image_portrait_python, scale, True, True)
+            # screen = pygame.display.get_surface()
+            # screen.blit(self.bg, (0, 0))
+            # draw_pieces_of_cheese(self.pieces_of_cheese, image_cheese, offset_x, offset_y, scale, self.width,
+            #                       self.height, screen,
+            #                       window_height)
+            # draw_players(self.player1_location, self.player2_location, image_rat, image_python, offset_x, offset_y,
+            #              scale, self.width,
+            #              self.height, screen, window_height)
+            # draw_scores("Rat", self.player1_score, image_portrait_rat, "Python", self.player2_score,
+            #             image_portrait_python, window_width,
+            #             window_height, screen, True, True, self.player1_last_move, self.player1_misses,
+            #             self.player2_last_move, self.player2_misses, 0,
+            #             0)
+            # pygame.display.update()
+            # pygame.event.get()
 
         elif mode == "none":
             pass
@@ -241,3 +241,31 @@ class PyratEnv(gym.Env):
             'player2_mud': spaces.Box(low=0, high=100, shape=(1,), dtype=np.int),
 
         })
+
+
+
+class PyratEnvNoMudVsGreedy(gym.Env):
+    def __init__(self, width=21, height=15, nb_pieces_of_cheese=41, max_turns=2000, target_density=0.7, connected=True,
+                 symmetry=True, maze_file="", start_random=False):
+        no_mud_env = PyratEnv(width=width, height=height, nb_pieces_of_cheese=nb_pieces_of_cheese, max_turns=max_turns, target_density=target_density, connected=connected,
+                 symmetry=symmetry, mud_density=0, mud_range=10, maze_file=maze_file, start_random=start_random)
+
+        vs_greedy_env = VsGreedyNoMud(no_mud_env)
+
+        self.env = vs_greedy_env
+
+        self.action_space = self.env.action_space
+        self.observation_space = self.env.observation_space
+
+        self.metadata = self.env.metadata
+        self.reward_range = self.env.reward_range
+
+    def reset(self):
+        return self.env.reset()
+
+    def render(self, mode='human'):
+        self.env.render(mode= mode)
+
+    def step(self, action):
+        return self.env.step(action)
+

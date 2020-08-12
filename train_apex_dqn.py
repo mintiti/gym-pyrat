@@ -1,6 +1,6 @@
 from ray.tune.utils import merge_dicts
 
-from pyrat_env.envs import PyratMultiAgent
+from pyrat.envs import PyratMultiAgent
 import ray
 from ray import tune
 from ray.rllib.agents.dqn.apex import APEX_DEFAULT_CONFIG, ApexTrainer
