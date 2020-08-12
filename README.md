@@ -14,8 +14,8 @@ You will need :
 * pygame
 
 ## Installation 
-Recommended installation : 
-while being in the gym-pyrat directory :
+Recommended installation :   
+With gym-pyrat as the working directory :
 ```bash
 pip install -e .
 ```
